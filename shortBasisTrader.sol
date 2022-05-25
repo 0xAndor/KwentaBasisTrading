@@ -130,7 +130,7 @@ contract shortBasisTrader is Ownable {
     require(isActive == false, 'position is still open...');
     uint balanceQuoteAsset = quoteAsset.balanceOf(address(this));
     quoteAsset.transfer(
-      owner,
+      msg.sender,
       balanceQuoteAsset
     );
   }
