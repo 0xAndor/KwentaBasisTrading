@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.7;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 interface ISpotExchange {
     function exchange(
       bytes32 sourceCurrencyKey,
@@ -12,17 +14,17 @@ interface ISpotExchange {
 
 interface IExchangeHelper {
     function getAmountsForExchange(
-        uint sourceAmount,
-        bytes32 sourceCurrencyKey,
-        bytes32 destinationCurrencyKey
+      uint sourceAmount,
+      bytes32 sourceCurrencyKey,
+      bytes32 destinationCurrencyKey
     )
-        external
-        view
-        returns (
-            uint,
-            uint,
-            uint
-        );
+      external
+      view
+      returns (
+        uint,
+        uint,
+        uint
+      );
 }
 
 interface IERC20 {
@@ -31,9 +33,9 @@ interface IERC20 {
     function allowance(address owner, address spender) external view returns (uint);
     function transfer(address to, uint value) external returns (bool);
     function transferFrom(
-        address from,
-        address to,
-        uint value
+      address from,
+      address to,
+      uint value
     ) external returns (bool);
 }
 
@@ -49,26 +51,12 @@ interface IFuturesMarket {
     external
     view
     returns (
-        uint64,
-        uint64,
-        uint128,
-        uint128,
-        int128
+      uint64,
+      uint64,
+      uint128,
+      uint128,
+      int128
     );
-}
-
-contract Ownable {
-
-  address public owner;
-  modifier onlyOwner {
-    require (msg.sender == owner);
-    _;
-  }
-
-  constructor () {
-    owner = msg.sender;
-  }
-
 }
 
 contract shortBasisTrader is Ownable {
