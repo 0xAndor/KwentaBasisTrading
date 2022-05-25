@@ -127,6 +127,7 @@ contract shortBasisTrader is Ownable {
   }
 
   function withdraw() external onlyOwner {
+    require(isActive == false, 'position is still open...');
     uint balanceQuoteAsset = quoteAsset.balanceOf(address(this));
     quoteAsset.transfer(
       owner,
