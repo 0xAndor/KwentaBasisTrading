@@ -139,6 +139,7 @@ contract shortBasisTrader is Ownable {
     uint futuresBalance;
     uint spotBalance;
     uint inactiveBalance;
+    uint currentEstimatedBalance;
     (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
     if (openPositionId > 0) {
       (uint futuresMarginRemaining, ) = futuresMarket.remainingMargin(address(this));
@@ -157,8 +158,7 @@ contract shortBasisTrader is Ownable {
       uint inactiveBalanceValue = quoteAsset.balanceOf(address(this));
       inactiveBalance = inactiveBalanceValue;
     }
-    uint currentEstimatedBalance = 
-      futuresBalance + spotBalance + inactiveBalance;
+    currentEstimatedBalance = futuresBalance + spotBalance + inactiveBalance;
     return currentEstimatedBalance;
   }
 
