@@ -25,7 +25,7 @@ interface IExchangeHelper {
         );
 }
 
-interface IQuoteAsset {
+interface IERC20 {
     function balanceOf(address owner) external view returns (uint);
     function approve(address spender, uint value) external returns (bool);
     function allowance(address owner, address spender) external view returns (uint);
@@ -35,11 +35,6 @@ interface IQuoteAsset {
         address to,
         uint value
     ) external returns (bool);
-}
-
-interface IBaseAsset {
-    function balanceOf(address owner) external view returns (uint);
-    function approve(address spender, uint value) external returns (bool);
 }
 
 interface IFuturesMarket {
@@ -79,8 +74,8 @@ contract Ownable {
 contract shortBasisTrader is Ownable {
 
   ISpotExchange spotExchange;
-  IQuoteAsset quoteAsset;
-  IBaseAsset baseAsset;
+  IERC20 quoteAsset;
+  IERC20 baseAsset;
   IFuturesMarket futuresMarket;
   IExchangeHelper exchangeHelper;
 
@@ -95,9 +90,9 @@ contract shortBasisTrader is Ownable {
     bytes32 _baseAssetKey
     ) {
     spotExchange = ISpotExchange(0x0064A673267696049938AA47595dD0B3C2e705A1);
-    quoteAsset = IQuoteAsset(0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57);
+    quoteAsset = IERC20(0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57);
     exchangeHelper = IExchangeHelper(0xfff685537fdbD9CA07BD863Ac0b422863BF3114f);
-    baseAsset = IBaseAsset(_baseAsset);
+    baseAsset = IERC20(_baseAsset);
     futuresMarket = IFuturesMarket(_futuresMarket);
     baseAssetKey = _baseAssetKey;
     quoteAssetKey = 0x7355534400000000000000000000000000000000000000000000000000000000;
