@@ -4,6 +4,10 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+/// @title Kwenta Short Basis Trade Manager
+/// @author 0xAndor
+/// @custom:experimental This is an experimental contract.
+
 interface ISpotExchange {
     function exchange(
       bytes32 sourceCurrencyKey,
@@ -76,6 +80,7 @@ contract ShortBasisTrader is Ownable {
   uint internal quoteAssetBalance;
   uint internal startingBalance;
 
+  /// @dev default market is sETH, can switch to other markets by calling changeMarket 
   constructor () {
     quoteAsset = IERC20(0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57);
     baseAsset = IERC20(0x94B41091eB29b36003aC1C6f0E55a5225633c884);
@@ -88,7 +93,8 @@ contract ShortBasisTrader is Ownable {
   function inActiveBalance() external view returns (uint) {
       return quoteAsset.balanceOf(address(this));
   }
-
+  
+  /// @notice returns the estimated value of an open position, does not deduct position closing fees
   function currentPositionValue() external view returns (uint) {
     require(isActive, 'no open position...');
     uint futuresBalance;
@@ -145,6 +151,8 @@ contract ShortBasisTrader is Ownable {
     );
   }
 
+  /// @notice buy spot baseAsset with 50% of sUSD and short same size on futures with the remainder
+  /// @dev overall position is still considered isActive when liquidated on futures until spot balance is also sold   
   function openNewPosition() external onlyOwner {
     require(isActive == false, 'only one open position at a time...');
     isActive = true;
@@ -165,6 +173,7 @@ contract ShortBasisTrader is Ownable {
     futuresMarket.modifyPosition(shortPositionSize);
   }
 
+  /// @notice close futures trade (unless already liquidated) and sell spot asset back to sUSD
   function closeActivePosition() external onlyOwner {
     require(isActive, 'no position to close...');
     isActive = false;
@@ -186,6 +195,7 @@ contract ShortBasisTrader is Ownable {
       );
   }
 
+   /// @notice switch baseAsset and corresponding futuresMarket if there is no open position
   function changeMarket (
     address _baseAsset,
     address _futuresMarket,
