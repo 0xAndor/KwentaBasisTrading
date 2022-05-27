@@ -90,7 +90,7 @@ contract ShortBasisTrader is Ownable {
     baseAssetKey = 'sETH';
   }
 
-  function inActiveBalance() external view returns (uint) {
+  function inactiveBalance() external view returns (uint) {
       return quoteAsset.balanceOf(address(this));
   }
   
@@ -117,25 +117,7 @@ contract ShortBasisTrader is Ownable {
   }
 
   function currentPositionPnL() external view returns (int) {
-    require(isActive, 'no open position...');
-    uint futuresBalance;
-    uint baseAssetValue;
-    uint estimatedBalance;
-    int estimatedPnL;
-    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
-    if (openPositionId > 0) {
-      (futuresBalance, ) = futuresMarket.remainingMargin(address(this));
-    }
-    if (baseAssetBalance > 0) {
-      (baseAssetValue, , ) =
-      exchangeHelper.getAmountsForExchange(
-        baseAssetBalance,
-        baseAssetKey,
-        quoteAssetKey
-      );
-    }
-    estimatedBalance = futuresBalance + baseAssetValue;
-    estimatedPnL = int(estimatedBalance) - int(startingBalance);
+    int estimatedPnL = int(this.currentPositionValue()) - int(startingBalance);
     return estimatedPnL;
   }
 
