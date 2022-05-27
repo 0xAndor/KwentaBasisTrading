@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
+/// @title Kwenta Short Basis Trade Manager
+/// @author 0xAndor
+/// @custom:experimental This is an experimental contract
+
 pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-
-/// @title Kwenta Short Basis Trade Manager
-/// @author 0xAndor
-/// @custom:experimental This is an experimental contract.
 
 interface ISpotExchange {
     function exchange(
