@@ -80,7 +80,7 @@ contract ShortBasisTrader is Ownable {
   uint internal quoteAssetBalance;
   uint internal startingBalance;
 
-  /// @dev default market is sETH, can switch to other markets by calling changeMarket 
+  /// @dev default market is sETH (can switch to other markets by calling changeMarket)
   constructor () {
     quoteAsset = IERC20(0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57);
     baseAsset = IERC20(0x94B41091eB29b36003aC1C6f0E55a5225633c884);
@@ -89,12 +89,13 @@ contract ShortBasisTrader is Ownable {
     futuresMarket = IFuturesMarket(0x698E403AaC625345C6E5fC2D0042274350bEDf78);
     baseAssetKey = 'sETH';
   }
-
+    
+  /// @notice returns idle sUSD balance of this contract
   function inactiveBalance() external view returns (uint) {
       return quoteAsset.balanceOf(address(this));
   }
   
-  /// @notice returns the estimated value of an open position, does not deduct position closing fees
+  /// @notice returns the estimated sUSD value of an open position (spot + futures)
   function currentPositionValue() external view returns (uint) {
     require(isActive, 'no open position...');
     uint futuresBalance;
@@ -115,7 +116,7 @@ contract ShortBasisTrader is Ownable {
     estimatedBalance = futuresBalance + baseAssetValue;
     return estimatedBalance;
   }
-
+  
   function currentPositionPnL() external view returns (int) {
     int estimatedPnL = int(this.currentPositionValue()) - int(startingBalance);
     return estimatedPnL;
@@ -133,8 +134,8 @@ contract ShortBasisTrader is Ownable {
     );
   }
 
-  /// @notice buy spot baseAsset with 50% of sUSD and short same size on futures with the remainder
-  /// @dev overall position is still considered isActive when liquidated on futures until spot balance is also sold   
+  /// @notice buy spot baseAsset with 50% of sUSD balance and short same size on futures with the remainder
+  /// @dev overall position is still considered isActive if liquidated on futures until spot balance is also sold   
   function openNewPosition() external onlyOwner {
     require(isActive == false, 'only one open position at a time...');
     isActive = true;
@@ -155,7 +156,7 @@ contract ShortBasisTrader is Ownable {
     futuresMarket.modifyPosition(shortPositionSize);
   }
 
-  /// @notice close futures trade (unless already liquidated) and sell spot asset back to sUSD
+  /// @notice close futures position (unless already liquidated) and sell spot baseAsset back to sUSD
   function closeActivePosition() external onlyOwner {
     require(isActive, 'no position to close...');
     isActive = false;
@@ -177,7 +178,7 @@ contract ShortBasisTrader is Ownable {
       );
   }
 
-   /// @notice switch baseAsset and corresponding futuresMarket if there is no open position
+   /// @notice switch baseAsset and corresponding futuresMarket
   function changeMarket (
     address _baseAsset,
     address _futuresMarket,
