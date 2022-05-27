@@ -9,7 +9,7 @@ interface ISpotExchange {
       bytes32 sourceCurrencyKey,
       uint256 sourceAmount,
       bytes32 destinationCurrencyKey
-    ) external;
+    ) external returns (uint);
 }
 
 interface IExchangeHelper {
@@ -59,55 +59,115 @@ interface IFuturesMarket {
     );
 }
 
-contract shortBasisTrader is Ownable {
+contract ShortBasisTrader is Ownable {
 
-  ISpotExchange spotExchange;
-  IERC20 quoteAsset;
-  IERC20 baseAsset;
-  IFuturesMarket futuresMarket;
-  IExchangeHelper exchangeHelper;
+  ISpotExchange immutable spotExchange;
+  IERC20 immutable quoteAsset;
+  IExchangeHelper immutable exchangeHelper;
 
-  bytes32 quoteAssetKey;
-  bytes32 baseAssetKey;
+  bytes32 constant quoteAssetKey = 'sUSD';
 
   bool public isActive;
 
-  constructor (
-    address _baseAsset,
-    address _futuresMarket,
-    bytes32 _baseAssetKey
-    ) {
-    spotExchange = ISpotExchange(0x0064A673267696049938AA47595dD0B3C2e705A1);
+  IERC20 internal  baseAsset;
+  IFuturesMarket internal futuresMarket;
+  bytes32 internal baseAssetKey;
+  uint internal baseAssetBalance;
+  uint internal quoteAssetBalance;
+  uint internal startingBalance;
+
+  constructor () {
     quoteAsset = IERC20(0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57);
+    baseAsset = IERC20(0x94B41091eB29b36003aC1C6f0E55a5225633c884);
+    spotExchange = ISpotExchange(0x0064A673267696049938AA47595dD0B3C2e705A1);
     exchangeHelper = IExchangeHelper(0xfff685537fdbD9CA07BD863Ac0b422863BF3114f);
-    baseAsset = IERC20(_baseAsset);
-    futuresMarket = IFuturesMarket(_futuresMarket);
-    baseAssetKey = _baseAssetKey;
-    quoteAssetKey = 0x7355534400000000000000000000000000000000000000000000000000000000;
+    futuresMarket = IFuturesMarket(0x698E403AaC625345C6E5fC2D0042274350bEDf78);
+    baseAssetKey = 'sETH';
   }
 
-  function deposit(uint _amountToDeposit) external {
+  function inActiveBalance() external view returns (uint) {
+      return quoteAsset.balanceOf(address(this));
+  }
+
+  function currentPositionValue() external view returns (uint) {
+    require(isActive, 'no open position...');
+    uint futuresBalance;
+    uint baseAssetValue;
+    uint estimatedBalance;
+    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
+    if (openPositionId > 0) {
+      (futuresBalance, ) = futuresMarket.remainingMargin(address(this));
+    }
+    if (baseAssetBalance > 0) {
+      (baseAssetValue, , ) =
+      exchangeHelper.getAmountsForExchange(
+        baseAssetBalance,
+        baseAssetKey,
+        quoteAssetKey
+      );
+    }
+    estimatedBalance = futuresBalance + baseAssetValue;
+    return estimatedBalance;
+  }
+
+  function currentPositionPnL() external view returns (int) {
+    require(isActive, 'no open position...');
+    uint futuresBalance;
+    uint baseAssetValue;
+    uint estimatedBalance;
+    int estimatedPnL;
+    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
+    if (openPositionId > 0) {
+      (futuresBalance, ) = futuresMarket.remainingMargin(address(this));
+    }
+    if (baseAssetBalance > 0) {
+      (baseAssetValue, , ) =
+      exchangeHelper.getAmountsForExchange(
+        baseAssetBalance,
+        baseAssetKey,
+        quoteAssetKey
+      );
+    }
+    estimatedBalance = futuresBalance + baseAssetValue;
+    estimatedPnL = int(estimatedBalance) - int(startingBalance);
+    return estimatedPnL;
+  }
+
+  function deposit(uint _amountToDeposit) external onlyOwner {
     quoteAsset.transferFrom(msg.sender, address(this), _amountToDeposit);
   }
 
-  function start() external onlyOwner {
-    uint balanceQuoteAsset = quoteAsset.balanceOf(address(this));
-    uint spotSize = balanceQuoteAsset / 2;
-    quoteAsset.approve(address(spotExchange), spotSize);
-    spotExchange.exchange(
-      quoteAssetKey,
-      spotSize,
-      baseAssetKey
+  function withdrawAll() external onlyOwner {
+    require(isActive == false, 'position is still open...');
+    quoteAsset.transfer(
+      msg.sender,
+      quoteAsset.balanceOf(address(this))
     );
-    int remainingQuoteAsset = int(quoteAsset.balanceOf(address(this)));
-    futuresMarket.transferMargin(remainingQuoteAsset);
-    int baseAssetBalance = int(baseAsset.balanceOf(address(this)));
-    int futuresSize = baseAssetBalance - (baseAssetBalance * 2);
-    futuresMarket.modifyPosition(futuresSize);
-    isActive = true;
   }
 
-  function stop() external onlyOwner {
+  function openNewPosition() external onlyOwner {
+    require(isActive == false, 'only one open position at a time...');
+    isActive = true;
+    quoteAssetBalance = quoteAsset.balanceOf(address(this));
+    startingBalance = quoteAssetBalance;
+    uint halfPositionSize = quoteAssetBalance / 2;
+    quoteAsset.approve(address(spotExchange), halfPositionSize);
+    quoteAssetBalance -= halfPositionSize;
+    baseAssetBalance =
+      spotExchange.exchange(
+        quoteAssetKey,
+        halfPositionSize,
+        baseAssetKey
+      );
+    int shortPositionSize = int(baseAssetBalance) - (int(baseAssetBalance) * 2);
+    quoteAssetBalance -= halfPositionSize;
+    futuresMarket.transferMargin(int(halfPositionSize));
+    futuresMarket.modifyPosition(shortPositionSize);
+  }
+
+  function closeActivePosition() external onlyOwner {
+    require(isActive, 'no position to close...');
+    isActive = false;
     (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
     if (openPositionId > 0) {
       futuresMarket.closePosition();
@@ -116,50 +176,26 @@ contract shortBasisTrader is Ownable {
     if (remaining > 0 ) {
       futuresMarket.withdrawAllMargin();
     }
-    uint balanceBaseAsset = baseAsset.balanceOf(address(this));
-    baseAsset.approve(address(spotExchange), balanceBaseAsset);
-    spotExchange.exchange(
-      baseAssetKey,
-      balanceBaseAsset,
-      quoteAssetKey
-    );
-    isActive = false;
-  }
-
-  function withdraw() external onlyOwner {
-    require(isActive == false, 'position is still open...');
-    uint balanceQuoteAsset = quoteAsset.balanceOf(address(this));
-    quoteAsset.transfer(
-      msg.sender,
-      balanceQuoteAsset
-    );
-  }
-
-  function currentBalance() external view returns (uint) {
-    uint futuresBalance;
-    uint spotBalance;
-    uint inactiveBalance;
-    uint currentEstimatedBalance;
-    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
-    if (openPositionId > 0) {
-      (uint futuresMarginRemaining, ) = futuresMarket.remainingMargin(address(this));
-      futuresBalance = futuresMarginRemaining;
-    } 
-    if (baseAsset.balanceOf(address(this)) > 0) {
-      (uint spotBalanceValue, , ) = 
-      exchangeHelper.getAmountsForExchange(
-        baseAsset.balanceOf(address(this)),
+    baseAsset.approve(address(spotExchange), baseAssetBalance);
+    baseAssetBalance = 0;
+    quoteAssetBalance =
+      spotExchange.exchange(
         baseAssetKey,
+        baseAsset.balanceOf(address(this)),
         quoteAssetKey
       );
-      spotBalance = spotBalanceValue;
-    } 
-    if (quoteAsset.balanceOf(address(this)) > 0) {
-      uint inactiveBalanceValue = quoteAsset.balanceOf(address(this));
-      inactiveBalance = inactiveBalanceValue;
-    }
-    currentEstimatedBalance = futuresBalance + spotBalance + inactiveBalance;
-    return currentEstimatedBalance;
+  }
+
+  function changeMarket (
+    address _baseAsset,
+    address _futuresMarket,
+    bytes32 _baseAssetKey
+    ) external
+    onlyOwner {
+    require(isActive == false, 'open position must be closed first...');
+    baseAsset = IERC20(_baseAsset);
+    futuresMarket = IFuturesMarket(_futuresMarket);
+    baseAssetKey = _baseAssetKey;
   }
 
 }
