@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-/// @title Kwenta Short Basis Trade Manager
+/// @title Kwenta Basis Trader
 /// @author 0xAndor
 /// @custom:experimental This is an experimental contract
 
