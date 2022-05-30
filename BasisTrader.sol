@@ -63,7 +63,7 @@ interface IFuturesMarket {
     );
 }
 
-contract ShortBasisTrader is Ownable {
+contract BasisTrader is Ownable {
 
   ISpotExchange immutable spotExchange;
   IERC20 immutable quoteAsset;
