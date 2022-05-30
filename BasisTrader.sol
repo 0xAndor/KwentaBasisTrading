@@ -80,13 +80,14 @@ contract BasisTrader is Ownable {
   uint internal quoteAssetBalance;
   uint internal startingBalance;
 
-  /// @dev default market is sETH (can switch to other markets by calling changeMarket)
+  /// @notice default market is sETH (can switch to other markets by calling changeMarket)
+  /// @dev OP mainnet addresses
   constructor () {
-    quoteAsset = IERC20(0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57);
-    baseAsset = IERC20(0x94B41091eB29b36003aC1C6f0E55a5225633c884);
-    spotExchange = ISpotExchange(0x0064A673267696049938AA47595dD0B3C2e705A1);
-    exchangeHelper = IExchangeHelper(0xfff685537fdbD9CA07BD863Ac0b422863BF3114f);
-    futuresMarket = IFuturesMarket(0x698E403AaC625345C6E5fC2D0042274350bEDf78);
+    quoteAsset = IERC20(0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9);
+    baseAsset = IERC20(0xE405de8F52ba7559f9df3C368500B6E6ae6Cee49);
+    spotExchange = ISpotExchange(0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4);
+    exchangeHelper = IExchangeHelper(0xcC02F000b0aA8a0eFC2B55C9cf2305Fb3531cca1);
+    futuresMarket = IFuturesMarket(0xf86048DFf23cF130107dfB4e6386f574231a5C65);
     baseAssetKey = 'sETH';
   }
     
