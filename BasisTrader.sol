@@ -51,6 +51,7 @@ interface IFuturesMarket {
     function currentFundingRate() external view returns (int);
     function accessibleMargin(address account) external view returns (uint, bool);
     function remainingMargin(address account) external view returns (uint, bool);
+    function liquidationPrice(address account) external view returns (uint, bool);
     function positions(address account)
     external
     view
@@ -77,7 +78,6 @@ contract BasisTrader is Ownable {
   IFuturesMarket internal futuresMarket;
   bytes32 internal baseAssetKey;
   uint internal baseAssetBalance;
-  uint internal quoteAssetBalance;
   uint internal startingBalance;
 
   /// @notice default market is sETH (can switch to other markets by calling changeMarket)
@@ -90,12 +90,19 @@ contract BasisTrader is Ownable {
     futuresMarket = IFuturesMarket(0xf86048DFf23cF130107dfB4e6386f574231a5C65);
     baseAssetKey = 'sETH';
   }
-    
+
   /// @notice returns idle sUSD balance of this contract
   function inactiveBalance() external view returns (uint) {
       return quoteAsset.balanceOf(address(this));
   }
-  
+
+  /// @notice returns futures liquidaton price of an open position
+  function futuresLiquidationPrice() external view returns (uint) {
+    require(isActive, 'no open position...');
+    (uint price, ) = futuresMarket.liquidationPrice(address(this));
+      return price;
+  }
+
   /// @notice returns the estimated sUSD value of an open position (spot + futures)
   function currentPositionValue() external view returns (uint) {
     require(isActive, 'no open position...');
@@ -117,10 +124,10 @@ contract BasisTrader is Ownable {
     estimatedBalance = futuresBalance + baseAssetValue;
     return estimatedBalance;
   }
-  
+
   function currentPositionPnL() external view returns (int) {
-    int estimatedPnL = int(this.currentPositionValue()) - int(startingBalance);
-    return estimatedPnL;
+    return int(this.currentPositionValue()) - int(startingBalance);
+
   }
 
   function deposit(uint _amountToDeposit) external onlyOwner {
@@ -135,25 +142,24 @@ contract BasisTrader is Ownable {
     );
   }
 
-  /// @notice buy spot baseAsset with 50% of sUSD balance and short same size on futures with the remainder
-  /// @dev overall position is still considered isActive if liquidated on futures until spot balance is also sold   
+  /// @notice buy spot baseAsset with 2/3 of sUSD and short same size on futures with the remaining 1/3 (apx. 2x leverage)
+  /// @dev overall position is considered isActive even if liquidated on futures (until spot balance is also sold)
   function openNewPosition() external onlyOwner {
     require(isActive == false, 'only one open position at a time...');
+    startingBalance = quoteAsset.balanceOf(address(this));
+    require(startingBalance > 0, 'no sUSD in the contract...');
+    int futuresMarginSize = int(startingBalance/3);
+    uint spotPositionSize = startingBalance - uint(futuresMarginSize);
     isActive = true;
-    quoteAssetBalance = quoteAsset.balanceOf(address(this));
-    startingBalance = quoteAssetBalance;
-    uint halfPositionSize = quoteAssetBalance / 2;
-    quoteAsset.approve(address(spotExchange), halfPositionSize);
-    quoteAssetBalance -= halfPositionSize;
+    quoteAsset.approve(address(spotExchange), spotPositionSize);
     baseAssetBalance =
       spotExchange.exchange(
         quoteAssetKey,
-        halfPositionSize,
+        spotPositionSize,
         baseAssetKey
       );
     int shortPositionSize = int(baseAssetBalance) - (int(baseAssetBalance) * 2);
-    quoteAssetBalance -= halfPositionSize;
-    futuresMarket.transferMargin(int(halfPositionSize));
+    futuresMarket.transferMargin(futuresMarginSize);
     futuresMarket.modifyPosition(shortPositionSize);
   }
 
@@ -171,8 +177,7 @@ contract BasisTrader is Ownable {
     }
     baseAsset.approve(address(spotExchange), baseAssetBalance);
     baseAssetBalance = 0;
-    quoteAssetBalance =
-      spotExchange.exchange(
+    spotExchange.exchange(
         baseAssetKey,
         baseAsset.balanceOf(address(this)),
         quoteAssetKey
