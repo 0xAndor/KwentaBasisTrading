@@ -98,9 +98,10 @@ contract BasisTrader is Ownable {
 
   /// @notice returns futures liquidaton price of an open position
   function futuresLiquidationPrice() external view returns (uint) {
-    require(isActive, 'no open position...');
+    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
+    require(openPositionId > 0, 'no open futures position...');
     (uint price, ) = futuresMarket.liquidationPrice(address(this));
-      return price;
+    return price;
   }
 
   /// @notice returns the estimated sUSD value of an open position (spot + futures)
