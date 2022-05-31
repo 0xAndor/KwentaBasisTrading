@@ -81,7 +81,7 @@ contract BasisTrader is Ownable {
   uint internal startingBalance;
 
   /// @notice default market is sETH (can switch to other markets by calling changeMarket)
-  /// @dev OP mainnet addresses
+  /// @dev OP testnet addresses
   constructor () {
     quoteAsset = IERC20(0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9);
     baseAsset = IERC20(0xE405de8F52ba7559f9df3C368500B6E6ae6Cee49);
@@ -176,12 +176,12 @@ contract BasisTrader is Ownable {
       futuresMarket.withdrawAllMargin();
     }
     baseAsset.approve(address(spotExchange), baseAssetBalance);
-    baseAssetBalance = 0;
     spotExchange.exchange(
         baseAssetKey,
-        baseAsset.balanceOf(address(this)),
+        baseAssetBalance,
         quoteAssetKey
       );
+    baseAssetBalance = 0;
   }
 
    /// @notice switch baseAsset and corresponding futuresMarket
@@ -198,3 +198,4 @@ contract BasisTrader is Ownable {
   }
 
 }
+
