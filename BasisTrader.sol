@@ -77,7 +77,7 @@ contract BasisTrader is Ownable {
   IERC20 internal  baseAsset;
   IFuturesMarket internal futuresMarket;
   bytes32 internal baseAssetKey;
-  uint internal baseAssetBalance;
+
   uint internal startingBalance;
 
   /// @notice default market is sETH (can switch to other markets by calling changeMarket)
@@ -98,8 +98,7 @@ contract BasisTrader is Ownable {
 
   /// @notice returns futures liquidaton price of an open position
   function futuresLiquidationPrice() external view returns (uint) {
-    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
-    require(openPositionId > 0, 'no open futures position...');
+    require(isActive, 'no open position...');
     (uint price, ) = futuresMarket.liquidationPrice(address(this));
     return price;
   }
@@ -110,18 +109,13 @@ contract BasisTrader is Ownable {
     uint futuresBalance;
     uint baseAssetValue;
     uint estimatedBalance;
-    (uint openPositionId, , , , ) = futuresMarket.positions(address(this));
-    if (openPositionId > 0) {
-      (futuresBalance, ) = futuresMarket.remainingMargin(address(this));
-    }
-    if (baseAssetBalance > 0) {
-      (baseAssetValue, , ) =
+    (futuresBalance, ) = futuresMarket.remainingMargin(address(this));
+    (baseAssetValue, , ) =
       exchangeHelper.getAmountsForExchange(
-        baseAssetBalance,
+        baseAsset.balanceOf(address(this)),
         baseAssetKey,
         quoteAssetKey
       );
-    }
     estimatedBalance = futuresBalance + baseAssetValue;
     return estimatedBalance;
   }
@@ -144,16 +138,15 @@ contract BasisTrader is Ownable {
   }
 
   /// @notice buy spot baseAsset with 2/3 of sUSD and short same size on futures with the remaining 1/3 (apx. 2x leverage)
-  /// @dev overall position is considered isActive even if liquidated on futures (until spot balance is also sold)
   function openNewPosition() external onlyOwner {
-    require(isActive == false, 'only one open position at a time...');
+    require(isActive == false, 'only one basis trade position at a time...');
     startingBalance = quoteAsset.balanceOf(address(this));
     require(startingBalance > 0, 'no sUSD in the contract...');
     int futuresMarginSize = int(startingBalance/3);
     uint spotPositionSize = startingBalance - uint(futuresMarginSize);
     isActive = true;
     quoteAsset.approve(address(spotExchange), spotPositionSize);
-    baseAssetBalance =
+    uint baseAssetBalance =
       spotExchange.exchange(
         quoteAssetKey,
         spotPositionSize,
@@ -165,6 +158,7 @@ contract BasisTrader is Ownable {
   }
 
   /// @notice close futures position (unless already liquidated) and sell spot baseAsset back to sUSD
+  /// @dev overall position is considered isActive even if liquidated on futures (until spot balance is also sold)
   function closeActivePosition() external onlyOwner {
     require(isActive, 'no position to close...');
     isActive = false;
@@ -176,13 +170,13 @@ contract BasisTrader is Ownable {
     if (remaining > 0 ) {
       futuresMarket.withdrawAllMargin();
     }
+    uint baseAssetBalance = baseAsset.balanceOf(address(this));
     baseAsset.approve(address(spotExchange), baseAssetBalance);
     spotExchange.exchange(
         baseAssetKey,
         baseAssetBalance,
         quoteAssetKey
       );
-    baseAssetBalance = 0;
   }
 
    /// @notice switch baseAsset and corresponding futuresMarket
@@ -199,4 +193,5 @@ contract BasisTrader is Ownable {
   }
 
 }
+
 
